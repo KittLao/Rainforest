@@ -1,0 +1,204 @@
+{% extends 'store/main.html' %}
+{% load static %}
+{% block content %}
+     <div class="row">
+		<div class="col-lg-6">
+			<div class="box-element" id="form-wrapper">
+				<form id="form">
+					{% csrf_token %}
+					<div id="user-info">
+						<div class="form-field">
+							<input required class="form-control" type="text" name="name" placeholder="Name..">
+						</div>
+						<div class="form-field">
+							<input required class="form-control" type="email" name="email" placeholder="Email..">
+						</div>
+					</div>
+					
+					<div id="shipping-info">
+						<hr>
+						<p>Shipping Information:</p>
+						<hr>
+						<div class="form-field">
+							<input class="form-control" type="text" name="address" placeholder="Address..">
+						</div>
+						<div class="form-field">
+							<input class="form-control" type="text" name="city" placeholder="City..">
+						</div>
+						<div class="form-field">
+							<input class="form-control" type="text" name="state" placeholder="State..">
+						</div>
+						<div class="form-field">
+							<input class="form-control" type="text" name="zipcode" placeholder="Zip code..">
+						</div>
+						<div class="form-field">
+							<input class="form-control" type="text" name="country" placeholder="Country..">
+						</div>
+					</div>
+
+					<hr>
+					<input id="form-button" class="btn btn-success btn-block" type="submit" value="Continue">
+				</form>
+			</div>
+
+			<br>
+			<div class="box-element hidden" id="payment-info">
+				<small>Paypal Options</small>
+				<!-- Set up a container element for the button -->
+				<div id="paypal-button-container"></div>
+				<!-- <button id="make-payment">Make payment</button> -->
+			</div>
+			
+		</div>
+
+		<div class="col-lg-6">
+			<div class="box-element">
+				<a  class="btn btn-outline-dark" href="{% url 'cart' %}">&#x2190; Back to Cart</a>
+				<hr>
+				<h3>Order Summary</h3>
+				<hr>
+				{% for item in items %}
+				<div class="cart-row">
+					<div style="flex:2"><img class="row-image" src="{{item.product.imageURL}}"></div>
+					<div style="flex:2"><p>{{item.product.name}}</p></div>
+					<div style="flex:1"><p>${{item.product.price|floatformat:2}}</p></div>
+					<div style="flex:1"><p>x{{item.quantity}}</p></div>
+				</div>
+				{% endfor %}
+				<h5>Items:   {{order.get_cart_items}}</h5>
+				<h5>Total:   ${{order.get_cart_total|floatformat:2}}</h5>
+			</div>
+		</div>
+	</div>
+
+	<!-- Include the PayPal JavaScript SDK to connect to buisness account. -->
+	<!-- Client Id is "AZ4TBquu35hv_m_Hb2EfCbAu0BuXtVI-EISQU889tAoqVkqVfixU4hNdaiq1B-kS3SEcN8hygShrCLbd" -->
+	<script src="https://www.paypal.com/sdk/js?client-id=AZ4TBquu35hv_m_Hb2EfCbAu0BuXtVI-EISQU889tAoqVkqVfixU4hNdaiq1B-kS3SEcN8hygShrCLbd&currency=USD&disable-funding=credit"></script>
+	<!-- Paypal button functionalities -->
+    <script>
+		var total = '{{order.get_cart_total}}';
+        // Render the PayPal button into #paypal-button-container
+        paypal.Buttons({
+			style: {
+				color: 'blue',
+				shape: 'rect'
+			},
+
+            // Set up the transaction
+            createOrder: function(data, actions) {
+                return actions.order.create({
+                    purchase_units: [{
+                        amount: {
+                            value: parseFloat(total).toFixed(2)
+                        }
+                    }]
+                });
+            },
+
+            // Finalize the transaction
+            onApprove: function(data, actions) {
+                return actions.order.capture().then(function(details) {
+					// Send data to the backend
+					submitFormData();
+                });
+            }
+
+        }).render('#paypal-button-container');
+    </script>
+
+	<script type="text/javascript">
+		// If the order isn't being shipped, do not want to display
+		// the shipping info form.
+		var shipping = '{{order.shipping}}';
+
+		if(shipping == 'False') {
+			document.getElementById('shipping-info').innerHTML = '';
+		}
+
+		// If user is logged in, do not ask them to enter in their
+		// info.
+		if(user != 'AnonymousUser') {
+			document.getElementById('user-info').innerHTML = '';
+		}
+
+		if(shipping == 'False' && user != 'AnonymousUser') {
+			// Hide entire form if user is logged in and shipping
+			// is false.
+			document.getElementById('form-wrapper').classList.add('hidden');
+			// Show payment if logged in user wants to buy an item
+			// that doesn't require shipping.
+			document.getElementById('payment-info').classList.remove('hidden');
+		}
+
+		var form = document.getElementById('form');
+		// Reset csrf token value that will be submitted.
+		csrftoken = form.getElementsByTagName('input')[0].value;
+		form.addEventListener('submit', function(e) {
+			// Prevent submission.
+			e.preventDefault();
+			console.log('Form submitted...');
+			// Once the customer enters in the shipping info, hide the
+			// 'Continue' button and show the payment options.
+			document.getElementById('form-button').classList.add('hidden');
+			document.getElementById('payment-info').classList.remove('hidden');
+		});
+
+		// document.getElementById('make-payment').addEventListener('click', function(e) {
+		// 	submitFormData()
+		// })
+
+		// Once form is submitted, want to update these values.
+		function submitFormData() {
+			var userFormData = {
+				'name': null,
+				'email': null,
+				'total': total
+			}
+			var shippingInfo = {
+				'address': null,
+				'city': null,
+				'state': null,
+				'zipcode': null
+			}
+
+			if(user == 'AnonymousUser') {
+				userFormData.name =  form.name.value;
+				userFormData.email =  form.email.value;
+			}
+			if(shipping != 'False') {
+				shippingInfo.address =  form.address.value;
+				shippingInfo.city =  form.city.value;
+				shippingInfo.state =  form.state.value;
+				shippingInfo.zipcode =  form.zipcode.value;
+			}
+			var url = '/process_order/';
+			fetch(url, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-CSRFToken': csrftoken
+				},
+				body: JSON.stringify({
+					'form': userFormData, 
+					'shipping': shippingInfo
+					})
+			})
+			.then((response) => {
+				response.json()
+			})
+			.then((data) => {
+				// After making the transaction, alert the user that the
+				// the transaction was successful. When user closes the
+				// window, send the user back to the homepage.
+				console.log('Success', data);
+				alert('Transaction completed');
+				// Cart should be empty after transaction. Reset cookie
+				// to an empty dictionary on the root domain.
+				cart = {}
+				document.cookie ='cart=' + JSON.stringify(cart) + ";domain=;path=/";
+				window.location.href = "{% url 'store' %}";
+			});
+		}
+
+	</script>
+{% endblock content %}
